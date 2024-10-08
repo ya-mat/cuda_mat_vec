@@ -1,0 +1,3 @@
+#nvfortran -cuda -O3 -gpu=cc90 -⁠gpu=mem:unified -Minfo=accel mat_vec.f90
+nvfortran -cuda -O3 -gpu=cc90 -gpu=managed -o a.out mat_vec.f90
+nvfortran -cuda -O3 -mp -gpu=cc90 -gpu=managed -o b.out mat_vec_managed.f90 -cudalib=cublas
