@@ -3,11 +3,11 @@ module gpu_kernel
 contains
   !------------------
   attributes(global) subroutine matrix_vector_multiply_kernel(A, x, y, N)
-    real(8), device :: A(:,:), x(:), y(:)
-    real(8) :: temp
+    complex*16, device :: A(:,:), x(:), y(:)
+    complex*16 :: temp
     integer, value :: N
     integer :: i, j, idx
- 
+
     idx = threadIdx%x + (blockIdx%x - 1) * blockDim%x
     if (idx < N) then
        temp = 0.0
@@ -28,7 +28,7 @@ program matrix_vector_multiplication
 
     integer :: N
     integer :: mode
-    real(8), allocatable :: A(:,:), x(:), y(:)
+    complex*16, allocatable :: A(:,:), x(:), y(:)
     integer :: i, j
     real :: time0, time1, time2
 
@@ -44,23 +44,30 @@ program matrix_vector_multiplication
 
     ! initiallize
     call random_seed()
-    do i = 1, N
-       call random_number(x(i))
-       x(i) = x(i) * 2.0d0 - 1.0d0
-       do j = 1, N
-          call random_number(A(i, j))
-          A(i, j) = A(i, j) * 2.0d0 - 1.0d0
-       end do
-    end do
+    block
+      real(8) :: tmp, tmp2
+      do i = 1, N
+         call random_number(tmp)
+         call random_number(tmp2)
+         x(i) = dcmplx(tmp * 2.0d0 - 1.0d0, tmp2 * 2.0d0 - 1.0d0)
+         do j = 1, N
+            call random_number(tmp)
+            call random_number(tmp2)
+            A(i, j) = dcmplx(tmp * 2.0d0 - 1.0d0, tmp2 * 2.0d0 - 1.0d0)
+         end do
+      end do
+    end block
 
     call cpu_time(time1)
     if(mode == 0) then
        ! cublas
-       call cublasDgemv('N', N, N, 1.0d0, A, N, x, 1, 0.0d0, y, 1)
+       call cublasZgemv('N', N, N, dcmplx(1.0d0, 0.0d0), A, N, x, 1, dcmplx(0.0d0, 0.0d0), y, 1)
        i = cudaDeviceSynchronize()
     else if(mode == 1) then
        ! kernel
-       call matrix_vector_multiply_kernel<<<(N+255)/256, 256>>>(A, x, y, N)
+       !call matrix_vector_multiply_kernel<<<(N+255)/256, 256>>>(A, x, y, N)
+       j = 512
+       call matrix_vector_multiply_kernel<<<(N+j-1)/j, j>>>(A, x, y, N)
        i = cudaDeviceSynchronize()
     else if(mode == 2) then
        ! cpu
